@@ -1,79 +1,3 @@
-<?php
-// Session-based data persistence for the single-file application
-session_start();
-
-// Initialize default monitored brand catalog if not set
-if (!isset($_SESSION['brands'])) {
-    $_SESSION['brands'] = [
-        "Aciguard", "Lotemp", "Haemaron", "Uniflox", "Unigyl", 
-        "Exiplon", "Unitrim", "Paracetamol", "Ibuprofen", "Ciprofloxacin"
-    ];
-}
-
-// Initialize QPPV Ticket Queue with a default Unique Pharmaceutical Limited signal
-if (!isset($_SESSION['tickets'])) {
-    $_SESSION['tickets'] = [
-        [
-            "ticketId"       => "ICSR-2026-8819",
-            "timestamp"      => date("Y-m-d H:i:s"),
-            "company"        => "Unique Pharmaceutical Limited",
-            "brandName"      => "Aciguard Suspension",
-            "safetySource"   => "Global Drug Safety Feed / MedWatch Online #412",
-            "adverseReaction"=> "Severe Epigastric Burning & Nausea",
-            "severity"       => "Serious (MedDRA SOC: Gastrointestinal disorders)",
-            "workflowStatus" => "Queued for QPPV Medical Review & Sign-off"
-        ]
-    ];
-}
-
-if (!isset($_SESSION['daily_count'])) {
-    $_SESSION['daily_count'] = 4120;
-}
-
-// Handle AJAX API POST requests
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    header('Content-Type: application/json');
-    $action = $_POST['action'] ?? '';
-
-    if ($action === 'upload_brands') {
-        $rawText = $_POST['brands_text'] ?? '';
-        $items = preg_split('/[\n,]/', $rawText);
-        $added = 0;
-        foreach ($items as $item) {
-            $clean = trim($item);
-            if (!empty($clean) && !in_array($clean, $_SESSION['brands'])) {
-                $_SESSION['brands'][] = $clean;
-                $added++;
-            }
-        }
-        echo json_encode(["status" => "success", "added" => $added, "totalBrands" => count($_SESSION['brands'])]);
-        exit;
-    }
-
-    if ($action === 'poll_stream') {
-        // Simulate scanning worldwide daily reports and catching a Unique Pharmaceutical Limited mention
-        $_SESSION['daily_count'] += 145;
-        $newTicket = [
-            "ticketId"       => "ICSR-2026-" . rand(1000, 9999),
-            "timestamp"      => date("Y-m-d H:i:s"),
-            "company"        => "Unique Pharmaceutical Limited",
-            "brandName"      => "Lotemp Ophthalmic Solution / Haemaron Syrup",
-            "safetySource"   => "Worldwide Drug Safety Report Feed / PubMed #902",
-            "adverseReaction"=> "Transient Ocular Pruritus & Mild Dizziness",
-            "severity"       => "Non-Serious (MedDRA SOC: Eye / Nervous system disorders)",
-            "workflowStatus" => "Queued for QPPV Medical Review & Sign-off"
-        ];
-        array_unshift($_SESSION['tickets'], $newTicket);
-        echo json_encode(["status" => "success", "newTicket" => $newTicket, "dailyCount" => $_SESSION['daily_count']]);
-        exit;
-    }
-
-    if ($action === 'get_tickets') {
-        echo json_encode($_SESSION['tickets']);
-        exit;
-    }
-}
-?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -128,7 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </head>
 <body>
     <aside>
-        <h1>PV PHP Signal Hub</h1>
+        <h1>PV Client Signal Hub</h1>
         <p>Brand Literature & ICSR Workflow</p>
         <a href="#" class="nav-link active">Live Vigilance Panel</a>
         <a href="#" class="nav-link" onclick="pollStream(); return false;">Poll Worldwide Reports</a>
@@ -137,7 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     <main>
         <header>
-            <h2>PHP Drug Safety Literature Monitor & ICSR Engine</h2>
+            <h2>Client-Side Drug Safety Literature Monitor & ICSR Engine</h2>
             <div class="badge" id="sysBadge">System Status: Monitoring | Target: Unique Pharmaceutical Ltd.</div>
         </header>
         
@@ -146,7 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div class="card">
                 <h3>1. Company Drug Brand List Upload Module</h3>
                 <p style="font-size: 0.83rem; color: #64748b; margin-bottom: 12px;">Upload comma or line-separated brand product portfolios. Automatically scans online literature matches for Unique Pharmaceutical Limited.</p>
-                <textarea id="brandInputBox" rows="4"><?php echo htmlspecialchars(implode(", ", $_SESSION['brands'])); ?></textarea>
+                <textarea id="brandInputBox" rows="4">Aciguard, Lotemp, Haemaron, Uniflox, Unigyl, Exiplon, Unitrim</textarea>
                 <button onclick="uploadBrandList()">Update Monitored Brand Portfolio</button>
             </div>
             
@@ -154,14 +78,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div class="card">
                 <h3>2. Virtual Pane: Worldwide Daily Report Feed</h3>
                 <div class="virtual-pane" id="virtualTerminal">
-                    [PHP SYSTEM INIT] Loaded brand safety libraries for Unique Pharmaceutical Limited.<br>
-                    [STREAM] Connected to worldwide drug safety data reporting endpoints.<br>
+                    [CLIENT SYSTEM INIT] Loaded brand safety libraries for Unique Pharmaceutical Limited.<br>
+                    [STREAM] Connected to simulated worldwide drug safety data reporting endpoints.<br>
                     [ACTIVE] Ready to poll daily case feeds and literature mentions...<br>
                     [WATCH] Monitoring brand names for spontaneous adverse reaction disclosures.
                 </div>
                 <div style="margin-top: 15px; display: flex; justify-content: space-between; align-items: center;">
                     <button class="btn-green" onclick="pollStream()">Poll Worldwide Daily Report Stream</button>
-                    <span id="dailyReportCounter" style="font-size: 0.83rem; font-weight: 600; color: #475569;">Worldwide Daily Reports: <?php echo $_SESSION['daily_count']; ?></span>
+                    <span id="dailyReportCounter" style="font-size: 0.83rem; font-weight: 600; color: #475569;">Worldwide Daily Reports: 4,120</span>
                 </div>
             </div>
             
@@ -186,17 +110,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         </tr>
                     </thead>
                     <tbody id="ticketTableBody">
-                        <?php foreach ($_SESSION['tickets'] as $t): ?>
                         <tr>
-                            <td><?php echo htmlspecialchars($t['ticketId']); ?></td>
-                            <td><?php echo htmlspecialchars($t['company']); ?></td>
-                            <td><?php echo htmlspecialchars($t['brandName']); ?></td>
-                            <td><?php echo htmlspecialchars($t['safetySource']); ?></td>
-                            <td><?php echo htmlspecialchars($t['adverseReaction']); ?></td>
-                            <td><span style="color: #e11d48; font-weight: 600;"><?php echo htmlspecialchars($t['severity']); ?></span></td>
-                            <td><?php echo htmlspecialchars($t['workflowStatus']); ?></td>
+                            <td>ICSR-2026-8819</td>
+                            <td>Unique Pharmaceutical Limited</td>
+                            <td>Aciguard Suspension</td>
+                            <td>Global Drug Safety Feed / MedWatch Online #412</td>
+                            <td>Severe Epigastric Burning & Nausea</td>
+                            <td><span style="color: #e11d48; font-weight: 600;">Serious (MedDRA SOC: Gastrointestinal disorders)</span></td>
+                            <td>Queued for QPPV Medical Review & Sign-off</td>
                         </tr>
-                        <?php endforeach; ?>
                     </tbody>
                 </table>
             </div>
@@ -204,6 +126,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </main>
 
     <script>
+        // In-memory data store for the browser session
+        let brandCatalog = ["Aciguard", "Lotemp", "Haemaron", "Uniflox", "Unigyl", "Exiplon", "Unitrim", "Paracetamol", "Ibuprofen", "Ciprofloxacin"];
+        let dailyCount = 4120;
+        let ticketsQueue = [
+            {
+                ticketId: "ICSR-2026-8819",
+                company: "Unique Pharmaceutical Limited",
+                brandName: "Aciguard Suspension",
+                safetySource: "Global Drug Safety Feed / MedWatch Online #412",
+                adverseReaction: "Severe Epigastric Burning & Nausea",
+                severity: "Serious (MedDRA SOC: Gastrointestinal disorders)",
+                workflowStatus: "Queued for QPPV Medical Review & Sign-off"
+            }
+        ];
+
         function logTerminal(text) {
             const terminal = document.getElementById('virtualTerminal');
             terminal.innerHTML += '<br>' + text;
@@ -212,76 +149,71 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         function uploadBrandList() {
             const data = document.getElementById('brandInputBox').value;
-            const formData = new FormData();
-            formData.append('action', 'upload_brands');
-            formData.append('brands_text', data);
-
-            fetch('', { method: 'POST', body: formData })
-            .then(res => res.json())
-            .then(response => {
-                logTerminal('[CONFIG] Updated brand portfolio successfully. Total active brands: ' + response.totalBrands);
-                alert('Brand product list uploaded successfully! Monitored count: ' + response.totalBrands);
+            const items = data.split(/[\n,]/);
+            let added = 0;
+            items.forEach(item => {
+                const clean = item.trim();
+                if (clean && !brandCatalog.includes(clean)) {
+                    brandCatalog.push(clean);
+                    added++;
+                }
             });
+            logTerminal('[CONFIG] Updated brand portfolio successfully. Total active brands: ' + brandCatalog.length);
+            alert('Brand product list uploaded successfully! Monitored count: ' + brandCatalog.length);
         }
 
         function pollStream() {
-            logTerminal('[POLL] Querying PHP backend for worldwide daily drug safety data reports & literature...');
+            logTerminal('[POLL] Querying worldwide daily drug safety data reports & literature...');
             document.getElementById('sysBadge').innerText = 'Status: Polling Worldwide Safety Feeds...';
             
-            const formData = new FormData();
-            formData.append('action', 'poll_stream');
-
-            fetch('', { method: 'POST', body: formData })
-            .then(res => res.json())
-            .then(response => {
-                setTimeout(() => {
-                    logTerminal('[MATCH] Adverse reaction literature match discovered for Unique Pharmaceutical Limited brand.');
-                    logTerminal('[WORKFLOW] Generated ICSR automated signal workflow ticket. Queued for QPPV review.');
-                    document.getElementById('sysBadge').innerText = 'Status: Monitoring | Signal Ticket Queued';
-                    document.getElementById('dailyReportCounter').innerText = 'Worldwide Daily Reports: ' + response.dailyCount;
-                    refreshQueueTable();
-                }, 1200);
-            });
+            setTimeout(() => {
+                dailyCount += 145;
+                const randomId = "ICSR-2026-" + Math.floor(1000 + Math.random() * 9000);
+                const newTicket = {
+                    ticketId: randomId,
+                    company: "Unique Pharmaceutical Limited",
+                    brandName: "Lotemp Ophthalmic Solution / Haemaron Syrup",
+                    safetySource: "Worldwide Drug Safety Report Feed / PubMed #902",
+                    adverseReaction: "Transient Ocular Pruritus & Mild Dizziness",
+                    severity: "Non-Serious (MedDRA SOC: Eye / Nervous system disorders)",
+                    workflowStatus: "Queued for QPPV Medical Review & Sign-off"
+                };
+                
+                ticketsQueue.unshift(newTicket);
+                
+                logTerminal('[MATCH] Adverse reaction literature match discovered for Unique Pharmaceutical Limited brand.');
+                logTerminal('[WORKFLOW] Generated ICSR automated signal workflow ticket. Queued for QPPV review.');
+                document.getElementById('sysBadge').innerText = 'Status: Monitoring | Signal Ticket Queued';
+                document.getElementById('dailyReportCounter').innerText = 'Worldwide Daily Reports: ' + dailyCount;
+                refreshQueueTable();
+            }, 1200);
         }
 
         function refreshQueueTable() {
-            const formData = new FormData();
-            formData.append('action', 'get_tickets');
-
-            fetch('', { method: 'POST', body: formData })
-            .then(res => res.json())
-            .then(tickets => {
-                const tbody = document.getElementById('ticketTableBody');
-                tbody.innerHTML = '';
-                tickets.forEach(t => {
-                    tbody.innerHTML += `<tr>
-                        <td>${t.ticketId}</td>
-                        <td>${t.company}</td>
-                        <td>${t.brandName}</td>
-                        <td>${t.safetySource}</td>
-                        <td>${t.adverseReaction}</td>
-                        <td><span style="color: #e11d48; font-weight: 600;">${t.severity}</span></td>
-                        <td>${t.workflowStatus}</td>
-                    </tr>`;
-                });
+            const tbody = document.getElementById('ticketTableBody');
+            tbody.innerHTML = '';
+            ticketsQueue.forEach(t => {
+                tbody.innerHTML += `<tr>
+                    <td>${t.ticketId}</td>
+                    <td>${t.company}</td>
+                    <td>${t.brandName}</td>
+                    <td>${t.safetySource}</td>
+                    <td>${t.adverseReaction}</td>
+                    <td><span style="color: #e11d48; font-weight: 600;">${t.severity}</span></td>
+                    <td>${t.workflowStatus}</td>
+                </tr>`;
             });
         }
 
         function downloadICSRTickets() {
-            const formData = new FormData();
-            formData.append('action', 'get_tickets');
-
-            fetch('', { method: 'POST', body: formData })
-            .then(res => res.text())
-            .then(payload => {
-                const blob = new Blob([payload], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const anchor = document.createElement('a');
-                anchor.href = url;
-                anchor.download = 'QPPV_ICSR_Automated_Signal_Tickets_' + new Date().toISOString().slice(0,10) + '.json';
-                anchor.click();
-                logTerminal('[EXPORT] Downloaded ICSR automated signal tickets package successfully.');
-            });
+            const payload = JSON.stringify(ticketsQueue, null, 2);
+            const blob = new Blob([payload], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const anchor = document.createElement('a');
+            anchor.href = url;
+            anchor.download = 'QPPV_ICSR_Automated_Signal_Tickets_' + new Date().toISOString().slice(0,10) + '.json';
+            anchor.click();
+            logTerminal('[EXPORT] Downloaded ICSR automated signal tickets package successfully.');
         }
     </script>
 </body>
